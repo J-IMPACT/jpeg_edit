@@ -1,0 +1,13 @@
+[package]
+name = "jpeg_edit"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+gloo = "0.11.0"
+gloo-dialogs = "0.2.0"
+gloo-utils = "0.2.0"
+leaflet = "0.4.1"
+little_exif = "0.6.5"
+web-sys = { version = "0.3.77", features = ["HtmlImageElement"] }
+yew = { version = "0.21.0", features = ["csr"] }
