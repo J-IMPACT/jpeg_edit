@@ -9,6 +9,7 @@ use yew::prelude::*;
 pub fn adsense_ad() -> Html {
     let ad_client_id = format!("ca-pub-{}", option_env!("AD_CLIENT_ID").unwrap_or("xxxxxxxxxxxxxxxx"));
     let ad_slot = option_env!("AD_SLOT").unwrap_or("xxxxxxxxxx");
+    /*
     use_effect(|| {
         if let Some(_window) = window() {
             let _ = js_sys::eval(
@@ -19,11 +20,12 @@ pub fn adsense_ad() -> Html {
         }
         || ()
     });
-
+    */
 
     html! {
         <div>
         <p>{format!("{} {}", ad_client_id, ad_slot)}</p>
+        /*
         <script async=true src={format!("https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={}", ad_client_id)} 
             crossorigin="anonymous">
         </script>
@@ -37,6 +39,7 @@ pub fn adsense_ad() -> Html {
         <script>
             { r#"(adsbygoogle = window.adsbygoogle || []).push({});"# }
         </script>
+        */
         </div>
     }
 }
@@ -252,7 +255,7 @@ fn app() -> Html {
                     <button class="secondary" onclick={
                         let latlng = latlng.clone();
                         Callback::from(move |_| {
-                            latlng.set(Some((0.0, 0.0)));
+                            latlng.set(Some((36.695055289275, 137.21132191834))); // 富山県庁
                         })
                     }>{ "GPS情報を追加する" }</button>
                 }
