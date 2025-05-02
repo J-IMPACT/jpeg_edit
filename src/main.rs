@@ -1,3 +1,6 @@
+use std::path::Path;
+
+use chrono::Local;
 use gloo::file::File;
 use gloo_dialogs::alert;
 use little_exif::{exif_tag::ExifTag, filetype::FileExtension, metadata::Metadata};
@@ -99,6 +102,10 @@ fn app() -> Html {
                 &*metadata, 
                 &*file_bytes
             ) {
+                let path = Path::new(name);
+                let opt_stem = path.file_stem().and_then(|s| s.to_str());
+                let opt_extension = path.extension().and_then(|e| e.to_str());
+
                 let (lat_ref, lat, lng_ref, lng) = latlng_to_exif(lat, lng);
                 let mut meta = meta.clone();
                 let mut bytes = bytes.clone();
@@ -106,8 +113,12 @@ fn app() -> Html {
                 meta.set_tag(ExifTag::GPSLatitude(lat));
                 meta.set_tag(ExifTag::GPSLongitudeRef(lng_ref));
                 meta.set_tag(ExifTag::GPSLongitude(lng));
-                match meta.write_to_vec(&mut bytes, FileExtension::JPEG) {
-                    Ok(()) => {
+                match (meta.write_to_vec(&mut bytes, FileExtension::JPEG), opt_stem, opt_extension) {
+                    (Ok(()), Some(stem), Some(extension)) => {
+                        let now = Local::now();
+                        let formatted = now.format("%H_%M_%S").to_string();
+                        let filename = format!("{}_{}.{}", stem, formatted, extension);
+                        
                         let uint8_array = Uint8Array::new_with_length(bytes.len() as u32);
                         uint8_array.copy_from(&bytes);
                         let array = js_sys::Array::new();
@@ -121,7 +132,7 @@ fn app() -> Html {
                                 match (document.create_element("a"), url) {
                                     (Ok(anchor), Ok(url)) => {
                                         let res_url = anchor.set_attribute("href", &url);
-                                        let res_name = anchor.set_attribute("download", name);
+                                        let res_name = anchor.set_attribute("download", &filename);
                                         match (document.body(), res_url, res_name) {
                                             (Some(body), Ok(()), Ok(())) => {
                                                 let res_child = body.append_child(&anchor);
@@ -143,7 +154,7 @@ fn app() -> Html {
                             _ => {}
                         }
                     }
-                    Err(_) => {}
+                    _ => {}
                 }
             }
         })
