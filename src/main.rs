@@ -1,11 +1,45 @@
 use gloo::file::File;
 use gloo_dialogs::alert;
-use gloo_utils::document;
-use leaflet::{LatLng, Map, MapOptions, Marker, TileLayer};
+use leaflet::{DragEndEvent, LatLng, Map, MapOptions, Marker, MarkerOptions, TileLayer};
 use little_exif::{exif_tag::ExifTag, filetype::FileExtension, metadata::Metadata, rational::uR64};
-use std::rc::Rc;
-use web_sys::{wasm_bindgen::{prelude::Closure, JsCast}, HtmlElement, HtmlImageElement, HtmlInputElement, Url};
+use web_sys::{js_sys::{self, Uint8Array}, wasm_bindgen::{prelude::Closure, JsCast}, window, Blob, HtmlElement, HtmlInputElement, Url};
 use yew::prelude::*;
+
+#[function_component(AdSenseAd)]
+pub fn adsense_ad() -> Html {
+    let ad_client_id = format!("ca-pub-{}", option_env!("AD_CLIENT_ID").unwrap_or("xxxxxxxxxxxxxxxx"));
+    let ad_slot = option_env!("AD_SLOT").unwrap_or("xxxxxxxxxx");
+    use_effect(|| {
+        if let Some(_window) = window() {
+            let _ = js_sys::eval(
+                r#"
+                (adsbygoogle = window.adsbygoogle || []).push({});
+                "#
+            );
+        }
+        || ()
+    });
+
+
+    html! {
+        <div>
+        <p>{format!("{} {}", ad_client_id, ad_slot)}</p>
+        <script async=true src={format!("https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={}", ad_client_id)} 
+            crossorigin="anonymous">
+        </script>
+
+        <ins class="adsbygoogle"
+            style="display:block"
+            data-ad-client={ad_client_id}
+            data-ad-slot={ad_slot}
+            data-ad-format="auto"
+            data-full-width-responsive="true"></ins>
+        <script>
+            { r#"(adsbygoogle = window.adsbygoogle || []).push({});"# }
+        </script>
+        </div>
+    }
+}
 
 fn ur64_to_f64(u: &uR64) -> f64 {
     u.nominator as f64 / u.denominator as f64
@@ -24,70 +58,73 @@ fn dir_to_f64(s: &str) -> Option<f64> {
     }
 }
 
-#[derive(Clone, Copy)]
-enum InputForm {
-    Width, Height
+fn f64_to_dms(value: f64) -> Option<Vec<uR64>> {
+    if value < 0.0 { return None; }
+    let (mut v, mut value) = (Vec::with_capacity(3), value);
+    for i in 0..3 {
+        v.push(value as u32);
+        value = (value - v[i] as f64) * 60.0;
+    }
+    Some(vec![
+        uR64 { nominator: v[0], denominator: 1 },
+        uR64 { nominator: v[1], denominator: 1 },
+        uR64 { nominator: v[2] * 100, denominator: 100 }
+    ])
+}
+
+fn latlng_to_exif(lat: f64, lng: f64) -> (String, Vec<uR64>, String, Vec<uR64>) {
+    (
+        if lat >= 0.0 { "N".to_string() } else { "S".to_string() },
+        f64_to_dms(lat.abs()).unwrap(),
+        if lng >= 0.0 { "E".to_string() } else { "W".to_string() },
+        f64_to_dms(lng.abs()).unwrap(),
+    )
 }
 
 #[function_component(App)]
 fn app() -> Html {
     let image_url = use_state(|| None::<String>);
-    let width = use_state(|| "".to_string());
-    let height =  use_state(|| "".to_string());
-    let original_wh = use_state(|| None::<(u32, u32)>);
-    let fix_ratio = use_state(|| true);
+    let file_name = use_state(|| None::<String>);
     let latlng = use_state(|| None::<(f64, f64)>);
     let reader = use_state(|| None);
+    let metadata = use_state(|| None);
+    let file_bytes = use_state(|| None);
 
     let on_file_change = {
         let image_url = image_url.clone();
-        let width = width.clone();
-        let height = height.clone();
-        let original_wh = original_wh.clone();
+        let file_name = file_name.clone();
         let latlng = latlng.clone();
         let reader = reader.clone();
+        let metadata = metadata.clone();
+        let file_bytes = file_bytes.clone();
 
         Callback::from(move |e: Event| {
             let input: HtmlInputElement = e.target_unchecked_into();
             if let Some(file) = input.files().and_then(|f| f.get(0)) {
                 if file.type_() != "image/jpeg" {
-                    alert("JPEG only");
+                    alert("JPEG画像にのみ対応しています");
                     return;
                 }
 
                 let file_size = file.size();
                 if file_size < 10_240.0 || file_size > 5_242_880.0 {
-                    alert("10kB ~ 5MB");
+                    alert("アップロードできるファイルサイズは 10kB ~ 5MB です");
                     return;
                 }
 
+                file_name.set(Some(file.name()));
                 let url = web_sys::Url::create_object_url_with_blob(&file).unwrap();
                 image_url.set(Some(url.clone()));
 
-                let image = Rc::new(HtmlImageElement::new().unwrap());
-                let image_clone = image.clone();
-                let url_clone = url.clone();
-                let (width, height) = (width.clone(), height.clone());
-                let original_wh = original_wh.clone();
-                let closure = Closure::wrap(Box::new(move || {
-                    let (w, h) = (image_clone.width(), image_clone.height());
-                    width.set(w.to_string());
-                    height.set(h.to_string());
-                    original_wh.set(Some((w, h)));
-                    Url::revoke_object_url(&url_clone).ok();
-                }) as Box<dyn Fn()>);
-
-                image.set_onload(Some(closure.as_ref().unchecked_ref()));
-                image.set_src(&url);
-                closure.forget();
-
                 let file_reader = gloo::file::callbacks::read_as_bytes(&File::from(file), {
                     let latlng = latlng.clone();
+                    let metadata = metadata.clone();
+                    let file_bytes = file_bytes.clone();
                     move |result| {
                         if let Ok(bytes) = result {
-                            if let Ok(metadata) = Metadata::new_from_vec(&bytes, FileExtension::JPEG) {
+                            if let Ok(meta) = Metadata::new_from_vec(&bytes, FileExtension::JPEG) {
                                 let (mut lat_ref, mut lat, mut lng_ref, mut lng) = (None, None, None, None);
-                                for ifd in metadata.get_ifds() {
+                                for ifd in meta.get_ifds() {
                                     for tag in ifd.get_tags() {
                                         match tag {
                                             ExifTag::GPSLatitudeRef(s) => { lat_ref = dir_to_f64(s); }
@@ -100,14 +137,10 @@ fn app() -> Html {
                                 }
                                 if let (Some(lat_ref), Some(lat), Some(lng_ref), Some(lng)) = (lat_ref, lat, lng_ref, lng) {
                                     latlng.set(Some((lat_ref * lat, lng_ref * lng)));
-                                } else {
-                                    latlng.set(Some((2.0, 2.0)));
                                 }
-                            } else {
-                                latlng.set(Some((1.0, 1.0)));
+                                metadata.set(Some(meta));
                             }
-                        } else {
-                            latlng.set(Some((0.0, 0.0)));
+                            file_bytes.set(Some(bytes));
                         }
                     }
                 });
@@ -116,71 +149,115 @@ fn app() -> Html {
         })
     };
 
-    let on_input = |form: InputForm| {
-        let width = width.clone();
-        let height = height.clone();
-        let original_wh = original_wh.clone();
-        let fix_ratio = fix_ratio.clone();
-        Callback::from(move |e: InputEvent| {
-            let input: HtmlInputElement = e.target_unchecked_into();
-            if let (Ok(value), Some((w, h))) = (input.value().parse::<u32>(), *original_wh) {
-                let wh_max = std::cmp::max(w, h);
-                if value < 1 || value > std::cmp::max(10000, wh_max) { return; }
-                match form {
-                    InputForm::Width => { width.set(value.to_string()); },
-                    InputForm::Height => { height.set(value.to_string()); },
-                }
+    let on_position_change = {
+        let latlng = latlng.clone();
+        Callback::from(move |(lat, lng): (f64, f64)| {
+            latlng.set(Some((lat, lng)));
+        })
+    };
 
-                if *fix_ratio {
-                    match form {
-                        InputForm::Width => {
-                            height.set(((value as f64 * h as f64 / w as f64) as u32).to_string());
-                        }
-                        InputForm::Height => {
-                            width.set(((value as f64 * w as f64 / h as f64) as u32).to_string());
+    let on_download = {
+        let file_name = file_name.clone();
+        let latlng = latlng.clone();
+        let metadata = metadata.clone();
+        Callback::from(move |_: MouseEvent| {
+            if let (
+                Some(name),
+                Some((lat, lng)),
+                Some(meta), 
+                Some(bytes),
+            ) = (
+                &*file_name,
+                *latlng,
+                &*metadata, 
+                &*file_bytes
+            ) {
+                let (lat_ref, lat, lng_ref, lng) = latlng_to_exif(lat, lng);
+                let mut meta = meta.clone();
+                let mut bytes = bytes.clone();
+                meta.set_tag(ExifTag::GPSLatitudeRef(lat_ref));
+                meta.set_tag(ExifTag::GPSLatitude(lat));
+                meta.set_tag(ExifTag::GPSLongitudeRef(lng_ref));
+                meta.set_tag(ExifTag::GPSLongitude(lng));
+                match meta.write_to_vec(&mut bytes, FileExtension::JPEG) {
+                    Ok(()) => {
+                        let uint8_array = Uint8Array::new_with_length(bytes.len() as u32);
+                        uint8_array.copy_from(&bytes);
+                        let array = js_sys::Array::new();
+                        array.push(&uint8_array.buffer());
+
+                        match Blob::new_with_u8_array_sequence(&array) {
+                            Ok(blob) => {
+                                let url = Url::create_object_url_with_blob(&blob);
+                                let window = window().unwrap();
+                                let document = window.document().unwrap();
+                                match (document.create_element("a"), url) {
+                                    (Ok(anchor), Ok(url)) => {
+                                        let res_url = anchor.set_attribute("href", &url);
+                                        let res_name = anchor.set_attribute("download", name);
+                                        match (document.body(), res_url, res_name) {
+                                            (Some(body), Ok(()), Ok(())) => {
+                                                let res_child = body.append_child(&anchor);
+                                                let res_ref = anchor.dyn_ref::<web_sys::HtmlElement>();
+                                                match (res_child, res_ref) {
+                                                    (Ok(_), Some(dr)) => {
+                                                        dr.click();
+                                                        let _ = Url::revoke_object_url(&url);
+                                                    }
+                                                    _ => {}
+                                                }
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            _ => {}
                         }
                     }
+                    Err(_) => {}
                 }
             }
         })
     };
 
-    let on_download = {
-        let image_url = image_url.clone();
-        let width = width.clone();
-        let height = height.clone();
-
-        /*Callback::from(move |_| {
-            let document = document();
-            //let img: HtmlImageElement = document.create
-        })*/
-    };
-
     html! {
-        <div>
-            <input type="file" accept="image/jpeg" onchange={on_file_change} />
+        <div id="app">
+            <div class="form-section">
+                <label class="form-label" for="fileInput">{"Upload JPEG Image"}</label>
+                <input id="fileInput" type="file" accept="image/jpeg" onchange={on_file_change} />
+            </div>
+
             if let Some(url) = &*image_url {
-                <img src={url.clone()} style="max-width: 100%; height: auto;" />
-                <div>
-                    <label>{"Width: "}</label>
-                    <input type="text" value={width.to_string()} oninput={on_input(InputForm::Width)} />
-                    {" x "}
-                    <label>{"Height: "}</label>
-                    <input type="text" value={height.to_string()} oninput={on_input(InputForm::Height)} />
-                    <input type="checkbox" checked={*fix_ratio} onchange={
-                        let fix_ratio = fix_ratio.clone();
-                        Callback::from(move |e: Event| {
-                            let input: HtmlInputElement = e.target_unchecked_into();
-                            fix_ratio.set(input.checked());
+                <img src={url.clone()} class="preview" />
+
+                if let Some((lat, lng)) = &*latlng {
+                    <div class="form-section">
+                        <label class="form-label">{"緯度"}</label>
+                        <input type="text" value={lat.to_string()} readonly=true />
+
+                        <label class="form-label">{"経度"}</label>
+                        <input type="text" value={lng.to_string()} readonly=true />
+                    </div>
+
+                    <div class="map-container" id="map">
+                        <MapComponent {lat} {lng} {on_position_change} />
+                    </div>
+
+                    <div class="button-row">
+                        <button class="secondary" onclick={on_download}>{ "ダウンロード" }</button>
+                    </div>
+                } else {
+                    <button class="secondary" onclick={
+                        let latlng = latlng.clone();
+                        Callback::from(move |_| {
+                            latlng.set(Some((0.0, 0.0)));
                         })
-                    } />
-                    <label>{"Fix ratio"}</label>
-                </div>
+                    }>{ "GPS情報を追加する" }</button>
+                }
             }
-            if let (Some(_), Some((lat, lng))) = (&*image_url, &*latlng) {
-                <p>{ format!("{} {}", lat, lng) }</p>
-                <MapComponent {lat} {lng} />
-            }
+            <AdSenseAd />
         </div>
     }
 }
@@ -189,6 +266,7 @@ fn app() -> Html {
 struct MapProps {
     pub lat: f64,
     pub lng: f64,
+    pub on_position_change: Callback<(f64, f64)>,
 }
 
 struct MapComponent {
@@ -208,15 +286,28 @@ impl Component for MapComponent {
     fn rendered(&mut self, ctx: &Context<Self>, first_render: bool) {
         let props = ctx.props();
         let latlng = LatLng::new(props.lat, props.lng);
+
         if first_render {
             if let Some(container) = self.node_ref.cast::<HtmlElement>() {
                 let map = Map::new_with_element(&container, &MapOptions::default());
                 map.set_view(&latlng, 11.0);
+
                 TileLayer::new(
                     "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 ).add_to(&map);
     
-                let marker = Marker::new(&latlng);
+                let marker_options = MarkerOptions::new();
+                marker_options.set_draggable(true);
+                let marker = Marker::new_with_options(&latlng, &marker_options);
+
+                let on_position_change = props.on_position_change.clone();
+                let marker_clone = marker.clone();
+                let closure = Closure::wrap(Box::new(move |_: DragEndEvent| {
+                    let new_pos = marker_clone.get_lat_lng();
+                    on_position_change.emit((new_pos.lat(), new_pos.lng()))
+                }) as Box<dyn FnMut(DragEndEvent)>);
+                marker.on("dragend", closure.as_ref().unchecked_ref());
+                closure.forget();
                 marker.add_to(&map);
     
                 self.map = Some(map);
@@ -225,7 +316,7 @@ impl Component for MapComponent {
         } else {
             if let (Some(map), Some(marker)) = (&self.map, &self.marker) {
                 marker.set_lat_lng(&latlng);
-                map.set_view(&latlng, 11.0);
+                map.set_view(&latlng, map.get_zoom());
             }
         }
     }

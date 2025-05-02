@@ -5,6 +5,7 @@
     <title>JPEG</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="JPEG">
+
     <link 
       rel="stylesheet" 
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
@@ -16,11 +17,21 @@
       integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" 
       crossorigin=""
     ></script>
-<link rel="modulepreload" href="/jpeg_edit-622d06fc0f32c1f8.js" crossorigin="anonymous" integrity="sha384-h6ynWOeK41g2wtfjebcgD1IV1i0/Nb17ub2Cv+NRJPHxoqnk4ulFrTuZdr6tSknB"><link rel="preload" href="/jpeg_edit-622d06fc0f32c1f8_bg.wasm" crossorigin="anonymous" integrity="sha384-Q49PMBAvAQguCePDgLePmDcB4h8uqeeF+Q7jCMwfGpLUjtnhINEQ8tBEKi9a9LU1" as="fetch" type="application/wasm"></head>
-<body>
+
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    />
+
+    
+    
+    <link rel="stylesheet" href="/static/style.css" />
+    <link rel="icon" href="/static/favicon.ico" />
+<link rel="modulepreload" href="/jpeg_edit-9cef016ac546310a.js" crossorigin="anonymous" integrity="sha384-ehiks5TYzHVLiL7jOEp2m2Iru9xbVf1ea41opB5xlnKPSoQWICzdYGSOAUL7OVhc"><link rel="preload" href="/jpeg_edit-9cef016ac546310a_bg.wasm" crossorigin="anonymous" integrity="sha384-/rnLX8pDOfFAKV6b2bEJXN5Fd5JqXZUjZqIAc9O4qz5PEQm9bDR0z9KdOC9RnON+" as="fetch" type="application/wasm"></head>
+<body class="bg-light">
 <script type="module">
-import init, * as bindings from '/jpeg_edit-622d06fc0f32c1f8.js';
-const wasm = await init({ module_or_path: '/jpeg_edit-622d06fc0f32c1f8_bg.wasm' });
+import init, * as bindings from '/jpeg_edit-9cef016ac546310a.js';
+const wasm = await init({ module_or_path: '/jpeg_edit-9cef016ac546310a_bg.wasm' });
 
 
 window.wasmBindings = bindings;
