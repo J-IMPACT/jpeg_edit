@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <title>JPEG</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="JPEG">
+
+    <link 
+      rel="stylesheet" 
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" 
+      crossorigin="" 
+    />
+    <script 
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" 
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" 
+      crossorigin=""
+    ></script>
+
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    />
+
+    
+    
+    <link rel="stylesheet" href="/static/style.css" />
+    <link rel="icon" href="/static/favicon.ico" />
+<link rel="modulepreload" href="/jpeg_edit-848568a177b0c1ad.js" crossorigin="anonymous" integrity="sha384-ICONroqRJiKfN2sITSXPnPXU88ZQkAlIVfslVnptw+AAsC87iHXcMkiBCbIepyCs"><link rel="preload" href="/jpeg_edit-848568a177b0c1ad_bg.wasm" crossorigin="anonymous" integrity="sha384-W+Tgs86ALfWevaNtDMLzCKv7zv+SJB8moN+jnZ3aaS4bdlx4TdeLMxSciopoaxy9" as="fetch" type="application/wasm"></head>
+<body class="bg-light">
+<script type="module">
+import init, * as bindings from '/jpeg_edit-848568a177b0c1ad.js';
+const wasm = await init({ module_or_path: '/jpeg_edit-848568a177b0c1ad_bg.wasm' });
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script></body>
+</html>
