@@ -14,7 +14,7 @@ jobs:
     environment: github-pages
 
     env:
-      AD_CLIENT_ID: ${{ vars.AD_CLIENT_ID }}
+      AD_CLIENT_ID: ${{ secrets.AD_CLIENT_ID }}
       AD_SLOT: ${{ secrets.AD_SLOT }}
 
     steps:
