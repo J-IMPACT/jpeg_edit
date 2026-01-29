@@ -20,7 +20,8 @@ pub fn adsense_ad() -> Html {
 
     html! {
         <div>
-        <p>{format!("{} {}", ad_client_id, ad_slot)}</p>
+        <p>{format!("Client ID: {}", ad_client_id)}</p>
+        <p>{format!("AD slot: {}", ad_slot)}</p>
         /*
         <script async=true src={format!("https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={}", ad_client_id)} 
             crossorigin="anonymous">
