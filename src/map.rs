@@ -61,10 +61,6 @@ impl Component for MapComponent {
         }
     }
 
-    fn update(&mut self, _ctx: &Context<Self>, _msg: Self::Message) -> bool {
-        false
-    }
-
     fn changed(&mut self, _ctx: &Context<Self>, _old_props: &Self::Properties) -> bool {
         true
     }
