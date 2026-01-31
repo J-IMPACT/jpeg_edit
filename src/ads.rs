@@ -3,7 +3,7 @@ use yew::prelude::*;
 
 #[function_component(AdSenseAd)]
 pub fn adsense_ad() -> Html {
-    let ad_client_id = format!("ca-pub-{}", option_env!("AD_CLIENT_ID").unwrap_or("xxxxxxxxxxxxxxxx"));
+    let ad_client_id = option_env!("AD_CLIENT_ID").unwrap_or("xxxxxxxxxxxxxxxx");
     let ad_slot = option_env!("AD_SLOT").unwrap_or("xxxxxxxxxx");
     /*
     use_effect(|| {
